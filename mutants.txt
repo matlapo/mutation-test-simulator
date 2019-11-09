@@ -1,0 +1,61 @@
+original line 0 : function foo(int x, int y) {
+==== mutations ====
+===================
+original line 1 : 	let z = x * y + 5;
+==== mutations ====
+	let z = x * y - 5;
+	let z = x * y * 5;
+	let z = x * y / 5;
+	let z = x + y + 5;
+	let z = x - y + 5;
+	let z = x / y + 5;
+===================
+original line 2 : 	let u = (z / 3) * y
+==== mutations ====
+	let u = (z / 3) + y
+	let u = (z / 3) - y
+	let u = (z / 3) / y
+	let u = (z + 3) * y
+	let u = (z - 3) * y
+	let u = (z * 3) * y
+===================
+original line 3 : 	while (true) {
+==== mutations ====
+===================
+original line 4 : 		print(z * u);
+==== mutations ====
+		print(z + u);
+		print(z - u);
+		print(z / u);
+===================
+original line 5 : 		x = x + 2;
+==== mutations ====
+		x = x - 2;
+		x = x * 2;
+		x = x / 2;
+===================
+original line 6 : 		u = u * x;
+==== mutations ====
+		u = u + x;
+		u = u - x;
+		u = u / x;
+===================
+original line 7 : 	}
+==== mutations ====
+===================
+original line 9 : 	return u - y;
+==== mutations ====
+	return u + y;
+	return u * y;
+	return u / y;
+===================
+original line 10 : }
+==== mutations ====
+===================
+==== report ====
+total number of mutants generated using:
++: 6
+-: 7
+*: 4
+\: 7
+===================
