@@ -5,7 +5,10 @@ import sys
 import re
 import os
 import subprocess
-import threading
+from multiprocessing.pool import ThreadPool
+
+# number of threads used to run simulation
+NUM_THREADS = 3
 
 if len(sys.argv) != 2:
     print("mutant_generator: invalid number of arguments", file=sys.stderr)
@@ -26,85 +29,16 @@ def map_operator(op):
         print("mutant_generator: unknown operator", file=sys.stderr)
         exit()
 
-def generate_mutants_from_report():
-    with open(sys.argv[1], 'r') as original:
-        with open('mutants.txt', 'r') as report:
-            data = report.read().split('\n')
-            original_lines = original.read().split('\n')
-            mutant_id = 0
-            for _, line in enumerate(data):
-                if len(line.strip()) == 0:
-                    continue
-                maybe_line_number = re.findall("original line (.?)", line)
-                if maybe_line_number:
-                    line_number = maybe_line_number[0]
-                    continue
-                elif re.match("==== mutations ====", line):
-                    continue
-                elif re.match("===================", line):
-                    continue
-                elif re.match("==== report ====", line):
-                    break
-                else:
-                    original_lines_copy = list(original_lines)
-                    original_lines_copy[int(line_number)] = line
-                    with open("mutant_" + str(mutant_id), 'w') as mutant:
-                        for i, line in enumerate(original_lines_copy):
-                            mutant.write(line + "\n")
-                        mutant_id += 1
-            return mutant_id
-    return None
-
-# for each line in sim file DONE
-# parse line as input/output DONE
-# for each mutant in directory DONE
-# run mutant with input and compare output with SUT DONE
-# write line in report whether mutant killed or not DONE
-# generate mutant coverage result DONE
-# run in parallel
-# BUG: mutant killed more than once DONE
-
-def run_simulation(number_of_mutants):
-    with open("simulation_file.txt", 'r') as simulation_file:
-        with open('mutants_survival.txt', 'w') as output:
-            data = simulation_file.read().split('\n')
-            mutant_set = set(range(0, number_of_mutants))
-            mutant_killed = 0
-            for _, line in enumerate(data):
-                if len(line.strip()) == 0:
-                        continue
-                in_out = re.findall(".*? .?", line)[0].split(" ")
-                in_val = in_out[0]
-                out_val = in_out[1]
-                mutant_base = "mutant_"
-                mutant_set_copy = mutant_set.copy()
-                # lock_killed = threading.Lock()
-                for i in mutant_set_copy:
-                    mutant_file = mutant_base + str(i)
-                    if not os.path.exists(mutant_file):
-                        break
-                    try:
-                        mutant_output = subprocess.check_output('python ' + mutant_file + " " + in_val, stderr=subprocess.STDOUT, shell=True).rstrip()
-                        if mutant_output != out_val:
-                            # mutant dies
-                            output.write("mutant_" + str(i) + " was killed\n")
-                            mutant_set.remove(i)
-                            mutant_killed += 1
-                        else:
-                            # mutant survives
-                            output.write("mutant_" + str(i) + " survived\n")
-                    except:
-                        # mutant dies
-                        output.write("mutant_" + str(i) + " was killed\n")
-                        mutant_set.remove(i)
-                        mutant_killed += 1
-                        continue
-            mutant_coverage = float(mutant_killed) / float(number_of_mutants)
-            output.write("mutant coverage: " + str(mutant_coverage * 100) + "%\n")
-        
-
 def generate_report():
-    # total number of mutations for each type
+    # this function takes the SUT, read it line by line,
+    # and if the line contains any of these operators: +,-,/,*
+    # then record the line and enumurate the possible mutations.
+    # example: 
+    # line 34: var x = u + i 
+    # mutations:
+    # var x = u - i
+    # var x = u * i
+    # var x = u / i
     report_plus = 0
     report_minus = 0
     report_times = 0
@@ -113,15 +47,17 @@ def generate_report():
     with open(sys.argv[1], 'r') as file:
         with open('mutants.txt', 'w') as output:
             data = file.read().split('\n')
+            # for every line in the SUT
             for i, line in enumerate(data):
                 if len(line.strip()) == 0:
                     continue
                 output.write("original line " + str(i) + " : " + line + "\n")
                 output.write("==== mutations ====\n")
+                # if any of +,-,*,/ are found on this line, then generate all possible
+                # mutations (i.e 3 mutations using the 3 other operators) and copy
+                # the mutated line in the report.
                 for operator in operators_regex:
                     indexes = [m.start() for m in re.finditer(operator, line)]
-                    # if len(indexes) != 0:
-                    #     output.write("replace " + map_operator(operator) + " operator:\n") TODO this makes parsing the report slightly annoying
                     for index in indexes:
                         for op in operators_regex:
                             # don't create a mutant with the same operator
@@ -140,6 +76,7 @@ def generate_report():
                             mutated = "".join(l)
                             output.write(mutated + "\n")
                 output.write("===================\n")
+            # append some statistics at the of the report
             output.write("==== report ====\n")
             output.write("total number of mutants generated using:\n")
             output.write("+: " + str(report_plus) + "\n")
@@ -150,8 +87,108 @@ def generate_report():
             return True
     return False
 
+def generate_mutants_from_report():
+    # given a report (generated by `generate_report()`), read 
+    # each mutation (a single line each) and replace it in a copy
+    # of the SUT. This creates a mutant that we can now test and compare
+    # its output with the SUT.
+    with open(sys.argv[1], 'r') as original:
+        with open('mutants.txt', 'r') as report:
+            data = report.read().split('\n')
+            # get the SUT code
+            original_lines = original.read().split('\n')
+            mutant_id = 0
+            for _, line in enumerate(data):
+                if len(line.strip()) == 0:
+                    continue
+                # find the line number where to replace the mutation
+                maybe_line_number = re.findall("original line (.?)", line)
+                if maybe_line_number:
+                    line_number = maybe_line_number[0]
+                    continue
+                # any of these lines below in the report are useless, skip them
+                elif re.match("==== mutations ====", line):
+                    continue
+                elif re.match("===================", line):
+                    continue
+                # we've reached the end of the report, we're done
+                elif re.match("==== report ====", line):
+                    break
+                else:
+                    original_lines_copy = list(original_lines)
+                    # replace the original line with the mutation
+                    original_lines_copy[int(line_number)] = line
+                    # write the full code in a new file
+                    with open("mutant_" + str(mutant_id), 'w') as mutant:
+                        for _, line in enumerate(original_lines_copy):
+                            mutant.write(line + "\n")
+                        mutant_id += 1
+            return mutant_id
+    return None
+
+def run_simulation_in_parallel(number_of_mutants):
+    # this inner function runs a single mutant (as a subprocess) and
+    # compares its output with the output of the SUT. If the outputs
+    # differs, the mutant is killed.
+    def run_simulation_single_mutant(i):
+        remove_mutant = False
+        try:
+            mutant_file = mutant_base + str(i)
+            mutant_output = subprocess.check_output('python ' + mutant_file + " " + in_val,
+                                                    stderr=subprocess.STDOUT, 
+                                                    shell=True).rstrip()
+            if mutant_output != out_val:
+                # mutant dies
+                output.write("mutant_" + str(i) + " was killed\n")
+                remove_mutant = True
+            else:
+                # mutant survives
+                output.write("mutant_" + str(i) + " survived\n")
+        except:
+            # mutant dies (the mutation causes a dynamic type error)
+            output.write("mutant_" + str(i) + " was killed\n")
+            remove_mutant = True
+        # either return a set containing the mutant number OR an empty set. 
+        # this makes the code cleaner when removing mutants by using set difference operation.
+        if remove_mutant:
+            return set([i])
+        else:
+            return set([])
+
+    # open the simulation file (which contains SUT input-output to compare)
+    with open("simulation_file.txt", 'r') as simulation_file:
+        # for reporting which mutant survived
+        with open('mutants_survival.txt', 'w') as output:
+            data = simulation_file.read().split('\n')
+            mutant_set = set(range(0, number_of_mutants))
+            # for every input-output values tested with the SUT, test each mutant
+            # with the same input and check if the output matches the one from SUT.
+            for _, line in enumerate(data):
+                if len(line.strip()) == 0:
+                        continue
+                in_out = re.findall(".*? .?", line)[0].split(" ")
+                in_val = in_out[0]
+                out_val = in_out[1]
+                mutant_base = "mutant_"
+                mutant_set_copy = mutant_set.copy()
+                # mutants are tested NUM_THREADS at a time using a threadpool
+                pool = ThreadPool(processes=NUM_THREADS)
+                mutants_to_remove = set([])
+                for i in mutant_set_copy:
+                    async_result = pool.apply_async(run_simulation_single_mutant, [i])
+                    return_val = async_result.get()
+                    # accumulate all the mutants that need to be killed
+                    mutants_to_remove = mutants_to_remove.union(return_val)
+                # remove the killed mutant from the list of mutants to test
+                mutant_set = mutant_set.difference(mutants_to_remove)
+            mutant_coverage = len(mutant_set) / float(number_of_mutants)
+            output.write("mutant coverage: " + str(mutant_coverage * 100) + "%\n")
+        
 if __name__ == "__main__":
+    # find all possible mutations in SUT
     if generate_report():
+        # generate all mutants (1 mutated line = 1 mutant = 1 new file)
         number_of_mutants = generate_mutants_from_report()
         if number_of_mutants:
-            run_simulation(number_of_mutants)
+            # test each mutant and compare their output with SUT
+            run_simulation_in_parallel(number_of_mutants)

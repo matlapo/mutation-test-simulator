@@ -13,4 +13,4 @@ mutant_5 survived
 mutant_3 survived
 mutant_4 survived
 mutant_5 survived
-mutant coverage: 66.6666666667%
+mutant coverage: 33.3333333333%
