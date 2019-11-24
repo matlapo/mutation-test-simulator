@@ -139,14 +139,14 @@ def run_simulation_in_parallel(number_of_mutants):
                                                     shell=True).rstrip()
             if mutant_output != out_val:
                 # mutant dies
-                output.write("mutant_" + str(i) + " was killed\n")
+                output.write("mutant_" + str(i) + " was killed by " + in_val + "\n")
                 remove_mutant = True
             else:
                 # mutant survives
                 output.write("mutant_" + str(i) + " survived\n")
         except:
             # mutant dies (the mutation causes a dynamic type error)
-            output.write("mutant_" + str(i) + " was killed\n")
+            output.write("mutant_" + str(i) + " was killed by " + in_val + "\n")
             remove_mutant = True
         # either return a set containing the mutant number OR an empty set. 
         # this makes the code cleaner when removing mutants by using set difference operation.
