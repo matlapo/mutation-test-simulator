@@ -1,61 +1,55 @@
-original line 0 : function foo(int x, int y) {
+original line 0 : def lengthOfLongestSubstring(s):
 ==== mutations ====
 ===================
-original line 1 : 	let z = x * y + 5;
-==== mutations ====
-	let z = x * y - 5;
-	let z = x * y * 5;
-	let z = x * y / 5;
-	let z = x + y + 5;
-	let z = x - y + 5;
-	let z = x / y + 5;
-===================
-original line 2 : 	let u = (z / 3) * y
-==== mutations ====
-	let u = (z / 3) + y
-	let u = (z / 3) - y
-	let u = (z / 3) / y
-	let u = (z + 3) * y
-	let u = (z - 3) * y
-	let u = (z * 3) * y
-===================
-original line 3 : 	while (true) {
+original line 1 :     dct = {}
 ==== mutations ====
 ===================
-original line 4 : 		print(z * u);
-==== mutations ====
-		print(z + u);
-		print(z - u);
-		print(z / u);
-===================
-original line 5 : 		x = x + 2;
-==== mutations ====
-		x = x - 2;
-		x = x * 2;
-		x = x / 2;
-===================
-original line 6 : 		u = u * x;
-==== mutations ====
-		u = u + x;
-		u = u - x;
-		u = u / x;
-===================
-original line 7 : 	}
+original line 2 :     max_so_far = curr_max = start = 0
 ==== mutations ====
 ===================
-original line 9 : 	return u - y;
+original line 3 :     for index, i in enumerate(s):
 ==== mutations ====
-	return u + y;
-	return u * y;
-	return u / y;
 ===================
-original line 10 : }
+original line 4 :         if i in dct and dct[i] >= start:
+==== mutations ====
+===================
+original line 5 :             max_so_far = max(max_so_far, curr_max)
+==== mutations ====
+===================
+original line 6 :             curr_max = index - dct[i]
+==== mutations ====
+            curr_max = index + dct[i]
+            curr_max = index * dct[i]
+            curr_max = index / dct[i]
+===================
+original line 7 :             start = dct[i] + 1
+==== mutations ====
+            start = dct[i] - 1
+            start = dct[i] * 1
+            start = dct[i] / 1
+===================
+original line 8 :         else:
+==== mutations ====
+===================
+original line 9 :             curr_max += 1
+==== mutations ====
+            curr_max -= 1
+            curr_max *= 1
+            curr_max /= 1
+===================
+original line 10 :         dct[i] = index
+==== mutations ====
+===================
+original line 11 :     return max(max_so_far, curr_max)
+==== mutations ====
+===================
+original line 13 : print(lengthOfLongestSubstring("abcabcbb"))
 ==== mutations ====
 ===================
 ==== report ====
 total number of mutants generated using:
-+: 6
--: 7
-*: 4
-\: 7
++: 1
+-: 2
+*: 3
+\: 3
 ===================
