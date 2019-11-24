@@ -5,6 +5,7 @@ import sys
 import re
 import os
 import subprocess
+import threading
 
 if len(sys.argv) != 2:
     print("mutant_generator: invalid number of arguments", file=sys.stderr)
@@ -51,51 +52,54 @@ def generate_mutants_from_report():
                         for i, line in enumerate(original_lines_copy):
                             mutant.write(line + "\n")
                         mutant_id += 1
-            return True
-    return False
+            return mutant_id
+    return None
 
 # for each line in sim file DONE
 # parse line as input/output DONE
 # for each mutant in directory DONE
-# run mutant with input and compare output with SUT 
+# run mutant with input and compare output with SUT DONE
 # write line in report whether mutant killed or not DONE
 # generate mutant coverage result DONE
 # run in parallel
+# BUG: mutant killed more than once DONE
 
-def run_simulation():
+def run_simulation(number_of_mutants):
     with open("simulation_file.txt", 'r') as simulation_file:
         with open('mutants_survival.txt', 'w') as output:
             data = simulation_file.read().split('\n')
-            for i, line in enumerate(data):
+            mutant_set = set(range(0, number_of_mutants))
+            mutant_killed = 0
+            for _, line in enumerate(data):
                 if len(line.strip()) == 0:
                         continue
                 in_out = re.findall(".*? .?", line)[0].split(" ")
                 in_val = in_out[0]
                 out_val = in_out[1]
                 mutant_base = "mutant_"
-                mutant_number = 0
-                mutant_killed = 0
-                while True:
-                    mutant_file = mutant_base + str(mutant_number)
+                mutant_set_copy = mutant_set.copy()
+                # lock_killed = threading.Lock()
+                for i in mutant_set_copy:
+                    mutant_file = mutant_base + str(i)
                     if not os.path.exists(mutant_file):
                         break
                     try:
-                        mutant_output = subprocess.check_output('python ' + mutant_file, stderr=subprocess.STDOUT, shell=True).rstrip()
+                        mutant_output = subprocess.check_output('python ' + mutant_file + " " + in_val, stderr=subprocess.STDOUT, shell=True).rstrip()
                         if mutant_output != out_val:
                             # mutant dies
-                            output.write("mutant_" + str(mutant_number) + " was killed\n")
+                            output.write("mutant_" + str(i) + " was killed\n")
+                            mutant_set.remove(i)
                             mutant_killed += 1
                         else:
                             # mutant survives
-                            output.write("mutant_" + str(mutant_number) + " survived\n")
-                        mutant_number += 1
+                            output.write("mutant_" + str(i) + " survived\n")
                     except:
                         # mutant dies
-                        output.write("mutant_" + str(mutant_number) + " was killed\n")
+                        output.write("mutant_" + str(i) + " was killed\n")
+                        mutant_set.remove(i)
                         mutant_killed += 1
-                        mutant_number += 1
                         continue
-            mutant_coverage = float(mutant_killed) / float(mutant_number)
+            mutant_coverage = float(mutant_killed) / float(number_of_mutants)
             output.write("mutant coverage: " + str(mutant_coverage * 100) + "%\n")
         
 
@@ -148,5 +152,6 @@ def generate_report():
 
 if __name__ == "__main__":
     if generate_report():
-        if generate_mutants_from_report():
-            run_simulation()
+        number_of_mutants = generate_mutants_from_report()
+        if number_of_mutants:
+            run_simulation(number_of_mutants)

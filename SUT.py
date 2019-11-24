@@ -1,3 +1,5 @@
+import sys
+
 def lengthOfLongestSubstring(s):
     dct = {}
     max_so_far = curr_max = start = 0
@@ -11,4 +13,4 @@ def lengthOfLongestSubstring(s):
         dct[i] = index
     return max(max_so_far, curr_max)
 
-print(lengthOfLongestSubstring("abcabcbb"))
+print(lengthOfLongestSubstring(sys.argv[1]))

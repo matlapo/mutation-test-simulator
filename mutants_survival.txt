@@ -1,0 +1,16 @@
+mutant_0 was killed
+mutant_1 was killed
+mutant_2 was killed
+mutant_3 survived
+mutant_4 survived
+mutant_5 survived
+mutant_6 was killed
+mutant_7 was killed
+mutant_8 was killed
+mutant_3 survived
+mutant_4 survived
+mutant_5 survived
+mutant_3 survived
+mutant_4 survived
+mutant_5 survived
+mutant coverage: 66.6666666667%
