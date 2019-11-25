@@ -141,7 +141,7 @@ def run_simulation_in_parallel(number_of_mutants):
                 # mutant dies
                 output.write("mutant_" + str(i) + " was killed by " + in_val + "\n")
                 remove_mutant = True
-            else:
+            else: 
                 # mutant survives
                 output.write("mutant_" + str(i) + " survived\n")
         except:
@@ -181,7 +181,7 @@ def run_simulation_in_parallel(number_of_mutants):
                     mutants_to_remove = mutants_to_remove.union(return_val)
                 # remove the killed mutant from the list of mutants to test
                 mutant_set = mutant_set.difference(mutants_to_remove)
-            mutant_coverage = len(mutant_set) / float(number_of_mutants)
+            mutant_coverage = float(number_of_mutants - len(mutant_set)) / float(number_of_mutants)
             output.write("mutant coverage: " + str(mutant_coverage * 100) + "%\n")
         
 if __name__ == "__main__":
